@@ -7,7 +7,7 @@ Features
 - Data Storage: Save and retrieve order details and menu data from files.
 Installation and Setup
 1. Clone this repository to your local machine:
-   git clone https://github.com/yourusername/restaurant-management-system.git
+   git clone https://github.com/junaed1031/Restaurant-management-system
 2. Open the project folder in your preferred IDE or text editor.
 3. Compile the program using a C compiler, such as GCC:
    gcc restaurant_management.c -o restaurant_management
