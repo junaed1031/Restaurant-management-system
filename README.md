@@ -25,8 +25,6 @@ Usage Instructions
 Folder Structure
 restaurant-management-system/
 ├── restaurant_management.c   # Main source code
-├── menu.txt                  # Sample menu data file
-├── orders.txt                # Sample orders storage file
 └── README.md                 # Documentation
 Technologies Used
 - Programming Language: C
@@ -36,4 +34,4 @@ Contributions are welcome! If you find any bugs or want to improve the system, f
 License
 This project is licensed under the MIT License. See the LICENSE file for more information.
 Author
-Developed by Junaid, a software engineering student passionate about learning and creating innovative software solutions.
+Developed by Junaed, a software engineering student passionate about learning and creating innovative software solutions.
