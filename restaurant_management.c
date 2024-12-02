@@ -1,6 +1,8 @@
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 #define MAX_NAME 50
 #define MAX_ITEMS 100
@@ -16,11 +18,17 @@
 #define MAGENTA "\033[1;35m"
 #define BOLD "\033[1m"
 
+// Structure for menu items
 typedef struct {
     char name[MAX_NAME];
     float price;
     int stock;
 } Item;
+
+typedef struct {
+    char userName[MAX_NAME];
+    char password[MAX_NAME];
+} Account;
 
 void adminMenu();
 void customerMenu();
@@ -31,18 +39,109 @@ void viewOrders();
 void viewReviews();
 void viewReservations();
 void customerViewItems();
-void makeOrder();
+void makeOrder(char *username);
+int processPayment(float totalBill, char *username, int isStudentOrder);
 void takeBill(char *username);
 void giveReview(char *username);
 void bookReservation(char *username);
 void takeBillWithDiscount(char *username);
 int isStudent();
+void toLowerCase(char *str);
+
+// Convert string to lowercase
+void toLowerCase(char *str) {
+    for (int i = 0; str[i]; i++) {
+        str[i] = tolower(str[i]);
+    }
+}
+
 
 // Utility functions
 void clearBuffer() {
     int c;
     while ((c = getchar()) != '\n' && c != EOF);
 }
+
+void registrationAccount() {
+    FILE *file = fopen("account.txt", "a");
+    if (!file) {
+        printf(RED "Error opening file!\n" RESET);
+        return;
+    }
+
+    Account user;
+
+    printf("Enter name: ");
+    fgets(user.userName, MAX_NAME, stdin);
+    user.userName[strcspn(user.userName, "\n")] = 0;  // Remove newline character
+
+    printf("Enter Password: ");
+    fgets(user.password, MAX_NAME, stdin);
+    user.password[strcspn(user.password, "\n")] = 0;  // Remove newline character
+
+    fprintf(file, "%s %s\n", user.userName, user.password);
+
+    fclose(file);
+
+    printf("Account created successfully!\n");
+
+    return;
+}
+
+void login() {
+    FILE *file = fopen("account.txt", "r");
+    if (!file) {
+        printf(RED "Error opening file!\n" RESET);
+        return;
+    }
+
+    char name[MAX_NAME];
+    printf("Enter name: ");
+    fgets(name, MAX_NAME, stdin);
+    name[strcspn(name, "\n")] = 0;  // Remove newline character
+
+    char password[MAX_NAME];
+    printf("Enter Password: ");
+    fgets(password, MAX_NAME, stdin);
+    password[strcspn(password, "\n")] = 0;  // Remove newline character
+
+    rewind(file);
+    char line[100];
+    while (fgets(line, sizeof(line), file)) {
+        Account account;
+        sscanf(line, "%s %s", account.userName, account.password);
+
+        if ((strcmp(account.userName, name) == 0) && (strcmp(account.password, password) == 0)) {
+            printf("Successful\n");
+            fclose(file);
+
+            adminMenu();
+            return;
+        }
+    }
+
+    printf("Invalid username or password.\n");
+    fclose(file);
+}
+
+void mainLogin() {
+    int choice;
+    printf("1. Register\n2. Login\nEnter your choice: ");
+    scanf("%d", &choice);
+    getchar();  // To consume the newline character left by scanf
+
+    if (choice == 1) {
+        registrationAccount();
+    } else if (choice == 2) {
+        login();
+    } else {
+        printf("Invalid choice\n");
+    }
+
+    return 0;
+}
+
+
 
 // Admin menu
 void adminMenu() {
@@ -102,12 +201,11 @@ void customerMenu() {
     while (1) {
         printf(BLUE"\n===== Customer Menu =====\n"RESET);
         printf(YELLOW"1. View Items\n"RESET);
-        printf(YELLOW"2. Make Order\n"RESET);
-        printf(YELLOW"3. Take Bill\n"RESET);
-        printf(YELLOW"4. Take Bill With Discount\n"RESET);
-        printf(YELLOW"5. Give Review\n"RESET);
-        printf(YELLOW"6. Book Reservation\n"RESET);
-        printf(YELLOW"7. Back\n"RESET);
+        printf(YELLOW"2. Search Menu Item\n"RESET);
+        printf(YELLOW"3. Make Order\n"RESET);
+        printf(YELLOW"4. Give Review\n"RESET);
+        printf(YELLOW"5. Book Reservation\n"RESET);
+        printf(YELLOW"6. Back\n"RESET);
         printf(MAGENTA"Enter your choice: "RESET);
         scanf("%d", &choice);
         clearBuffer();
@@ -117,21 +215,18 @@ void customerMenu() {
             customerViewItems();
             break;
         case 2:
-            makeOrder(username);
+            searchItems();
             break;
         case 3:
-            takeBill(username);
+            makeOrder(username);
             break;
         case 4:
-            takeBillWithDiscount(username);
-            break;
-        case 5:
             giveReview(username);
             break;
-        case 6:
+        case 5:
             bookReservation(username);
             break;
-        case 7:
+        case 6:
             return;
         default:
             printf(RED"Invalid choice. Try again.\n"RESET);
@@ -164,8 +259,8 @@ void addItems() {
         clearBuffer();
 
         fprintf(file, "%s,%.2f,%d\n", item.name, item.price, item.stock);
-        printf(GREEN"Item added successfully!\n"RESET);
     }
+    printf(GREEN"Item added successfully!\n"RESET);
     fclose(file);
 }
 
@@ -274,205 +369,189 @@ void viewReservations() {
 }
 
 // Function to search for an item in the menu
+// Function to search for an item in the menu
 void searchItems() {
     FILE *file = fopen("menu.txt", "r");
     if (!file) {
-        printf(RED"No items found.\n"RESET);
+        printf(RED "No items found.\n" RESET);
         return;
     }
 
-    char searchName[MAX_NAME];
-    printf(MAGENTA"Enter the name of the item to search: "RESET);
-    fgets(searchName, MAX_NAME, stdin);
-    searchName[strcspn(searchName, "\n")] = 0; // Remove newline
+    while (1) {
+        char searchName[MAX_NAME];
+        printf(MAGENTA "Enter the name of the item to search (or type 'back' to return): " RESET);
+        fgets(searchName, MAX_NAME, stdin);
 
-    printf(BLUE"\n===== Search Results =====\n"RESET);
-    char line[100];
-    int found = 0;
-    while (fgets(line, sizeof(line), file)) {
-        Item item;
-        sscanf(line, "%[^,],%f,%d", item.name, &item.price, &item.stock);
+        // Remove newline character if present
+        searchName[strcspn(searchName, "\n")] = 0;
 
-        // Case insensitive comparison
-        if (strstr(item.name, searchName) != NULL) {
-            printf(GREEN"Item found: %s - Price: %.2f, Stock: %d\n"RESET, item.name, item.price, item.stock);
-            found = 1;
+        // Exit the search if the user types "back"
+        if (strcasecmp(searchName, "back") == 0) {
+            printf(YELLOW "Returning to the previous menu.\n" RESET);
+            break; // Exit the loop and return to the calling function
+        }
+
+        printf(BLUE "\n===== Search Results =====\n" RESET);
+
+        // Reset the file pointer to the beginning of the file
+        rewind(file);
+
+        char line[100];
+        int found = 0;
+        while (fgets(line, sizeof(line), file)) {
+            Item item;
+            sscanf(line, "%[^,],%f,%d", item.name, &item.price, &item.stock);
+
+            // Convert strings to lowercase for case-insensitive comparison
+            char itemNameLower[MAX_NAME], searchNameLower[MAX_NAME];
+            strcpy(itemNameLower, item.name);
+            strcpy(searchNameLower, searchName);
+            for (int i = 0; itemNameLower[i]; i++) itemNameLower[i] = tolower(itemNameLower[i]);
+            for (int i = 0; searchNameLower[i]; i++) searchNameLower[i] = tolower(searchNameLower[i]);
+
+            // Case-insensitive substring search
+            if (strstr(itemNameLower, searchNameLower) != NULL) {
+                printf(GREEN "Item found: %s - Price: %.2f, Stock: %d\n" RESET, item.name, item.price, item.stock);
+                found = 1;
+            }
+        }
+
+        if (!found) {
+            printf(RED "Item not found.\n" RESET);
         }
     }
 
-    if (!found) {
-        printf(RED"Item not found.\n"RESET);
-    }
-
-    fclose(file);
+    fclose(file); // Close the file when exiting the function
 }
-
 
 
 void customerViewItems() {
     viewItems();
 }
 
+// Place an order
 void makeOrder(char *username) {
     FILE *menuFile = fopen("menu.txt", "r");
     FILE *tempFile = fopen("temp_menu.txt", "w");
-    FILE *orderFile = fopen("orders.txt", "w");
+    FILE *orderFile = fopen("orders.txt", "a");
 
     if (!menuFile || !tempFile || !orderFile) {
-        printf(RED"Error: Unable to access required files.\n"RESET);
+        printf(RED "Error accessing necessary files.\n" RESET);
+        if (menuFile) fclose(menuFile);
+        if (tempFile) fclose(tempFile);
+        if (orderFile) fclose(orderFile);
         return;
     }
 
-    printf(BLUE"\n===== Place Your Order =====\n"RESET);
-    printf(GREEN"Available items:\n"RESET);
-    viewItems();
-
     char itemName[MAX_NAME];
     int quantity;
-    float totalPrice = 0;
+    float totalBill = 0;
 
-    printf(MAGENTA"Enter the item name to order: "RESET);
-    fgets(itemName, MAX_NAME, stdin);
-    itemName[strcspn(itemName, "\n")] = 0; // Remove newline
+    int isStudentOrder = isStudent();
 
-    printf(MAGENTA"Enter quantity: "RESET);
-    scanf("%d", &quantity);
-    clearBuffer();
+    while (1) {
+        printf(MAGENTA "Enter item name to order (or 'done' to finish): " RESET);
+        fgets(itemName, MAX_NAME, stdin);
+        itemName[strcspn(itemName, "\n")] = 0;
+        toLowerCase(itemName);
 
-    char line[100];
-    int found = 0;
+        if (strcmp(itemName, "done") == 0) break;
 
-    while (fgets(line, sizeof(line), menuFile)) {
-        Item item;
-        sscanf(line, "%[^,],%f,%d", item.name, &item.price, &item.stock);
+        printf(MAGENTA "Enter quantity: " RESET);
+        scanf("%d", &quantity);
+        clearBuffer();
 
-        if (strcmp(item.name, itemName) == 0) {
-            found = 1;
-            if (quantity > item.stock) {
-                printf(RED"Not enough stock available for %s.\n"RESET, item.name);
-                fclose(menuFile);
-                fclose(tempFile);
-                fclose(orderFile);
-                remove("temp_menu.txt"); // Remove temp file
-                return;
+        if (quantity <= 0) {
+            printf(RED "Invalid quantity. Please enter a positive number.\n" RESET);
+            continue;
+        }
+
+        char line[256];
+        int found = 0;
+        rewind(menuFile);
+
+        while (fgets(line, sizeof(line), menuFile)) {
+            Item item;
+            sscanf(line, "%[^,],%f,%d", item.name, &item.price, &item.stock);
+            toLowerCase(item.name);
+
+            if (strcmp(item.name, itemName) == 0) {
+                found = 1;
+                if (quantity > item.stock) {
+                    printf(RED "Insufficient stock for %s.\n" RESET, item.name);
+                } else {
+                    float orderPrice = quantity * item.price;
+                    totalBill += orderPrice;
+                    item.stock -= quantity;
+                    fprintf(orderFile, "Customer: %s, Item: %s, Quantity: %d, Total: %.2f\n",
+                            username, item.name, quantity, orderPrice);
+                    printf(GREEN "Order added: %s x%d. Subtotal: %.2f\n" RESET, item.name, quantity, orderPrice);
+                }
             }
 
-            // Update stock and calculate total price
-            item.stock -= quantity;
-            totalPrice = quantity * item.price;
-
-            // Write updated item to temp file
+            // Write updated stock information to the temporary file
             fprintf(tempFile, "%s,%.2f,%d\n", item.name, item.price, item.stock);
-
-            // Record order in orders file
-            fprintf(orderFile, "Customer: %s, Item: %s, Quantity: %d, Total: %.2f\n", username, item.name, quantity, totalPrice);
-            printf(GREEN"Order placed successfully! Total Price: %.2f\n"RESET, totalPrice);
-        } else {
-            // Write unchanged item to temp file
-            fprintf(tempFile, "%s", line);
         }
-    }
 
-    if (!found) {
-        printf(RED"Item not found in the menu.\n"RESET);
+        if (!found) {
+            printf(RED "Item not found in menu.\n" RESET);
+        }
     }
 
     fclose(menuFile);
     fclose(tempFile);
     fclose(orderFile);
 
-    // Replace original menu file with updated temp file
-    remove("menu.txt");
-    rename("temp_menu.txt", "menu.txt");
-}
+    int paymentSuccess = processPayment(totalBill, username, isStudentOrder);
 
-void takeBill(char *username) {
-    FILE *orderFile = fopen("orders.txt", "r");
-    if (!orderFile) {
-        printf(RED"Error: Unable to access orders file.\n"RESET);
-        return;
+    // Ensure the menu file is only updated if the payment is successful
+    if (paymentSuccess) {
+        remove("menu.txt");
+        rename("temp_menu.txt", "menu.txt");
+    } else {
+        remove("temp_menu.txt");
     }
-
-    printf(BLUE"\n===== Bill for %s =====\n"RESET, username);
-    char line[200];
-    int found = 0;
-    float totalBill = 0;
-
-    while (fgets(line, sizeof(line), orderFile)) {
-        if (strstr(line, username)) {
-            printf("%s", line);
-            found = 1;
-            float orderTotal;
-            sscanf(strrchr(line, ':') + 1, "%f", &orderTotal);
-            totalBill += orderTotal;
-        }
-    }
-
-    if (!found) {
-        printf(RED"No orders found for %s.\n"RESET, username);
-        fclose(orderFile);
-        return;
-    }
-
-    printf(GREEN"Total Bill: %.2f\n"RESET, totalBill);
-    fclose(orderFile);
-
-    // Call payment menu
-    paymentMenu(totalBill, username);
 }
 
 
+// Process payment
+int processPayment(float totalBill, char *username, int isStudentOrder) {
+    if (isStudentOrder) {
+        float discount = totalBill * STUDENT_DISCOUNT_RATE / 100;
+        totalBill -= discount;
+        printf(GREEN"Student discount applied: -%.2f\n"RESET, discount);
+    }
+
+    printf(BLUE"Final Bill: %.2f\n"RESET, totalBill);
+    printf(MAGENTA"Do you want to proceed with payment? (Y/N): "RESET);
+    char confirm;
+    scanf(" %c", &confirm);
+    clearBuffer();
+
+    if (confirm == 'Y' || confirm == 'y') {
+        printf(GREEN"Payment successful for %.2f! Thank you, %s.\n"RESET, totalBill, username);
+        return 1;
+    } else {
+        printf(RED"Payment canceled. Order not completed.\n"RESET);
+        return 0;
+    }
+}
+
+
+
+// Check if the user is a student
 int isStudent() {
     char studentID[20];
-    char confirm;
+    char choice;
     printf(MAGENTA"Are you a student? (Y/N): "RESET);
-    scanf(" %c", &confirm);
-    if (confirm == 'Y' || confirm == 'y') {
+    scanf(" %c", &choice);
+    if (choice == 'Y' || choice == 'y') {
         printf(MAGENTA"Enter your Student ID: "RESET);
         scanf("%s", studentID);
         printf(GREEN"Student ID verified successfully!\n"RESET);
-        return 1; // Student confirmed
+        clearBuffer();
+        return (choice == 'Y' || choice == 'y'); // Student confirmed
     }
-    return 0; // Not a student
-}
-
-void takeBillWithDiscount(char *username) {
-    FILE *orderFile = fopen("orders.txt", "r");
-    if (!orderFile) {
-        printf(RED"Error: Unable to access orders file.\n"RESET);
-        return;
-    }
-
-    printf(BLUE"\n===== Bill for %s =====\n"RESET, username);
-    char line[200];
-    int found = 0;
-    float totalBill = 0;
-    while (fgets(line, sizeof(line), orderFile)) {
-        if (strstr(line, username)) {
-            printf("%s", line);
-            found = 1;
-            float orderTotal;
-            sscanf(strrchr(line, ':') + 1, "%f", &orderTotal);
-            totalBill += orderTotal;
-        }
-    }
-
-    if (!found) {
-        printf(RED"No orders found for %s.\n"RESET, username);
-        fclose(orderFile);
-        return;
-    }
-
-    printf(GREEN"Total Bill (before discount):"RESET" %.2f\n", totalBill);
-
-    if (isStudent()) {
-        float discount = (totalBill * STUDENT_DISCOUNT_RATE) / 100;
-        totalBill -= discount;
-        printf(GREEN"Student Discount Applied: -"RESET"%.2f\n", discount);
-    }
-
-    printf(GREEN"Final Bill (after discount if applicable): "RESET"%.2f\n", totalBill);
-    fclose(orderFile);
 }
 
 void giveReview(char *username) {
@@ -530,34 +609,15 @@ void displayLogo() {
     printf("\t\t\t*                                               *\n");
     printf("\t\t\t*************************************************\n\n");
 }
-void paymentMenu(float totalBill, char *username) {
-    int paymentChoice;
-    printf(BLUE"\n===== Payment Options =====\n"RESET);
-    printf("1. Pay with Card\n");
-    printf("2. Pay with Bkash\n");
-    printf("3. Cancel Payment\n");
-    printf(MAGENTA"Enter your choice: "RESET);
-    scanf("%d", &paymentChoice);
-    clearBuffer();
 
-    switch (paymentChoice) {
-    case 1:
-        printf(GREEN"Processing payment through Card...\n"RESET);
-        printf(GREEN"Payment successful! Thank you, %s.\n"RESET, username);
-        break;
-    case 2:
-        printf(GREEN"Processing payment through Bkash...\n");
-        printf("Please complete the payment via your Bkash app.\n");
-        printf("Payment successful! Thank you, %s.\n"RESET, username);
-        break;
-    case 3:
-        printf(RED"Payment cancelled. Please try again.\n");
-        break;
-    default:
-        printf("Invalid choice. Payment not processed.\n"RESET);
-    }
+
+void clearScreen() {
+    #ifdef _WIN32
+        system("cls");  // For Windows
+    #else
+        system("clear");  // For Unix-based systems (Linux/macOS)
+    #endif // _WIN32
 }
-
 
 
 // Main function
@@ -576,7 +636,7 @@ int main() {
 
         switch (choice) {
         case 1:
-            adminMenu();
+            mainLogin();
             break;
         case 2:
             customerMenu();
@@ -589,4 +649,5 @@ int main() {
         }
     }
 }
+
 
